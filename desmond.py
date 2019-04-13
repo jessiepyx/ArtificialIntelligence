@@ -72,7 +72,7 @@ def bit_count(b):
     return b
 
 
-def get_lsb(bitmap):
+def get_lsb(bitmap):  # 返回的是bitmap最后一个1的**位置**
     ans = 0
     curMask = 0xFFFFFFFF
     curLen = 32
@@ -85,8 +85,10 @@ def get_lsb(bitmap):
         curMask >>= curLen
     return ans
 
+
 def pop_lsb(bitmap):
     return get_lsb(bitmap), bitmap & (bitmap - 1)
+
 
 def fill_bit_table():
     global BIT
@@ -143,8 +145,8 @@ def get_move_list(next_moves):
     return move_list
 
 
-def to_move(bitmove):
-    return bitmove % 8, bitmove // 8  # (x,y)
+def to_move(oct_move):
+    return oct_move % 8, oct_move // 8  # (x,y)
 
 
 def to_bitmove(move):
@@ -180,20 +182,20 @@ class Node:
 
     def expand(self):
         random_move = self.state.available_moves[self.state.current_step]  # available_moves存储了所有的可行解
-        self.state.current_step += 1                                       # 移动到下一个move
-        (curW, curB) = self.state.current_board
-        flip_mask = flip(curW, curB, random_move)
-        curW ^= flip_mask | BIT[random_move]    # 该部分被翻转，并且添加上随机走的子
-        curB ^= flip_mask                       # 该部分被翻转
-        child_node = Node()
-        new_state = State()
-        new_state.color = self.state.color * -1
-        new_state.current_board = (curB, curW)
-        next_moves = move_gen(curB, curW)
+        self.state.current_step += 1  # 移动到下一个move
+        (curW, curB) = self.state.current_board  # 获得当前棋盘状态
+        flip_mask = flip(curW, curB, random_move)  # 计算当前的move会引起的翻转情况
+        curW ^= flip_mask | BIT[random_move]  # 该部分被翻转，并且添加上随机走的子
+        curB ^= flip_mask  # 该部分被翻转
+        child_node = Node()  # 生成新的子节点
+        new_state = State()  # 生成新的State
+        new_state.color = self.state.color * -1  # 更新新的State的Color数据
+        new_state.current_board = (curB, curW)  # 更新新的State的棋盘数据
+        next_moves = move_gen(curB, curW)  # 生成可行解的移动序列
         new_state.available_moves = shuffle(get_move_list(next_moves))  # 随机安排move的顺序
-        new_state.current_step = 0
-        child_node.state = new_state
-        self.children.append(child_node)
+        new_state.move_from_parent = random_move  # 安排子节点是由父节点的哪个move移动过来的
+        child_node.state = new_state  # 安排子节点的State为新生成的State
+        self.children.append(child_node)  # 把当前新建的节点append到父节点的子节点序列中
         return child_node
 
 
@@ -201,32 +203,35 @@ class State:
     def __init__(self):
         self.color = 1  # 1: 白棋， -1：黑棋
         self.value = 0.0
-        self.terminal = False
-        self.available_moves = []
-        self.current_step = 0
+        self.terminal = False  # 是否已经执行完毕
+        self.available_moves = []  # 可行移动操作序列
+        self.current_step = 0  # 当前已经尝试过哪些可行移动操作序列
         self.current_board = (None, None)  # (My, Opponent's)两个局面
+        self.move_from_parent = 0  # 通过父节点的哪个move移动过来的，这里保存的是move的十进制数字编码
 
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 1000
-        self.root = Node()
-        new_state = State()
-        self.root.state = new_state
+        self.budget = 1000  # 计算资源的预算
+        self.root = Node()  # 根节点
+        new_state = State()  # 根节点的状态
+        self.root.state = new_state  # 绑定状态与节点
 
     def init_tree(self, board, color):
-        self.root.state.current_board = to_bitboard(board)
-        self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0], self.root.state.current_board[1]))
-        self.root.state.color = color
+        self.root.state.current_board = to_bitboard(board)  # 将board数据转化成位图数据
+        self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
+                                                                 self.root.state.current_board[1]))
+        # 生成根节点的所有可行移动
+        self.root.state.color = color  # 标记当前颜色
 
     @staticmethod
     def tree_policy(node):
-        while not node.state.terminal:
-            if node.all_expanded():
+        while not node.state.terminal:  # 只要当前局面未陷入终止状态，则继续采用Tree_policy
+            if node.all_expanded():     # 如果全部展开了，就再向下寻找最优子节点
                 node = node.best_child(True)
             else:
-                child = node.expand()
-                return child
+                child = node.expand()   # 如果还有没展开的就展开出一个新的节点
+                return child            # Tree_Policy展开获得了当前的节点
         return node
 
     def default_policy(self, node):
@@ -254,5 +259,6 @@ class DesmondEngine(Engine):
 
     def get_move(self, board, color, move_num=None,
                  time_remaining=None, time_opponent=None):
-        moves = board.get_legal_moves(color)
-        pass
+        mcTree = MonteCarloTree()
+        mcTree.init_tree(board, color)
+        return to_move(mcTree.tree_search(mcTree.root).move_from_parent)
