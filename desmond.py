@@ -216,7 +216,9 @@ class State:
         return False
 
     def get_next_move_with_random_choice(self):
-        move_set = move_gen(self.current_board[0], self.current_board[1])
+        move_choice = random.sample(get_move_list(move_gen(self.current_board[0], self.current_board[1])), 1)
+        self.current_boardto_bitmove(move_choice)
+
 
 
 class MonteCarloTree:
@@ -245,7 +247,7 @@ class MonteCarloTree:
     def default_policy(node):
         current_state = node.state
         while not current_state.terminal():
-            current_state = current_state.get_next_move_with_random_choice()
+            current_state.get_next_move_with_random_choice()
         final_state_reward = current_state.compute_reward()
         return final_state_reward
 
