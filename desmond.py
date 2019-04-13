@@ -271,6 +271,10 @@ class MonteCarloTree:
 
     def init_tree(self, board, color):
         self.root.state.current_board = to_bitboard(board)  # 将board数据转化成位图数据
+        if color == -1:
+            (self.root.state.current_board[0],
+             self.root.state.current_board[1]) = (self.root.state.current_board[1],
+                                                  self.root.state.current_board[0])
         self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
                                                                  self.root.state.current_board[1]))
         # 生成根节点的所有可行移动
