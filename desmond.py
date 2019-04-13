@@ -3,6 +3,7 @@ from random import shuffle
 import sys
 import math
 import random
+import copy
 
 FULL_MASK = 0xFFFFFFFF
 RADIAL_MAP = {}
@@ -292,7 +293,7 @@ class MonteCarloTree:
 
     @staticmethod
     def default_policy(node):
-        current_state = node.state
+        current_state = copy.deepcopy(node.state)
         while not current_state.terminal():
             current_state.get_next_move_with_random_choice()
         final_state_reward = current_state.compute_reward()
@@ -327,3 +328,5 @@ class DesmondEngine(Engine):
         mcTree = MonteCarloTree()
         mcTree.init_tree(board, color)
         return to_move(mcTree.tree_search(mcTree.root).move_from_parent)
+
+engine = DesmondEngine
