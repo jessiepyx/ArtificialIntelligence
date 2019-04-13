@@ -155,13 +155,6 @@ def to_bitmove(move):
     return move[0] + 8 * move[1]
 
 
-def count_bit(b):
-    b -= (b >> 1) & 0x5555555555555555;
-    b = (((b >> 2) & 0x3333333333333333) + (b & 0x3333333333333333));
-    b = ((b >> 4) + b) & 0x0F0F0F0F0F0F0F0F;
-    return ((b * 0x0101010101010101) & FULL_MASK) >> 56
-
-
 class Node:
     def __init__(self):
         self.parent = None
@@ -233,16 +226,16 @@ class State:
         W = self.current_board[0]
         B = self.current_board[1]
 
-        mycorner = count_bit(W & self.P_CORNER)
-        opcorner = count_bit(B & self.P_CORNER)
+        mycorner = bit_count(W & self.P_CORNER)
+        opcorner = bit_count(B & self.P_CORNER)
 
         # piece difference
         mypiece = mycorner * 100
         for i in range(len(self.WEIGHTS)):
-            mypiece += self.WEIGHTS[i] * count_bit(W & self.P_RINGS[i])
+            mypiece += self.WEIGHTS[i] * bit_count(W & self.P_RINGS[i])
         oppiece = opcorner * 100
         for i in range(len(self.WEIGHTS)):
-            oppiece += self.WEIGHTS[i] * count_bit(B & self.P_RINGS[i])
+            oppiece += self.WEIGHTS[i] * bit_count(B & self.P_RINGS[i])
 
         # scorepiece = \
         #             10.0 * mypiece / (mypiece + oppiece) if mypiece > oppiece \
