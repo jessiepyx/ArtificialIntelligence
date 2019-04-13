@@ -2,6 +2,7 @@ from engines import Engine
 from random import shuffle
 import sys
 import math
+import random
 
 FULL_MASK = 0xFFFFFFFF
 RADIAL_MAP = {}
@@ -203,7 +204,6 @@ class State:
     def __init__(self):
         self.color = 1  # 1: 白棋， -1：黑棋
         self.value = 0.0
-        self.terminal = False  # 是否已经执行完毕
         self.available_moves = []  # 可行移动操作序列
         self.current_step = 0  # 当前已经尝试过哪些可行移动操作序列
         self.current_board = (None, None)  # (My, Opponent's)两个局面
@@ -213,12 +213,22 @@ class State:
         pass
 
     def terminal(self):
-        bit_move = move_gen(self.current_board[0], self.current_board[1])
-        return bit_move == 0
+        first_bitmove = move_gen(self.current_board[0], self.current_board[1])
+        second_bitmove = move_gen(self.current_board[1], self.current_board[0])
+        return (first_bitmove == 0) & (second_bitmove == 0)
 
     def get_next_move_with_random_choice(self):
-        bit_move = move_gen(self.current_board[0], self.current_board[1])
-        move_set = get_move_list(bit_move)
+        random_move = random.choice(self.available_moves)
+        (curW, curB) = self.current_board  # 获得当前棋盘状态
+        flip_mask = flip(curW, curB, random_move)  # 计算当前的move会引起的翻转情况
+        curW ^= flip_mask | BIT[random_move]  # 该部分被翻转，并且添加上随机走的子
+        curB ^= flip_mask  # 该部分被翻转
+        self.color = self.color * -1  # 更新新的State的Color数据
+        self.current_board = (curB, curW)  # 更新新的State的棋盘数据
+        next_moves = move_gen(curB, curW)  # 生成可行解的移动序列
+        self.available_moves = shuffle(get_move_list(next_moves))  # 随机安排move的顺序
+
+
 
 
 class MonteCarloTree:
