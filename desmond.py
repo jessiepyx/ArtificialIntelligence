@@ -205,6 +205,18 @@ class State:
         self.available_moves = []
         self.current_step = 0
         self.current_board = (None, None)  # (My, Opponent's)两个局面
+    
+    def compute_reward(self):
+    pass
+
+    def terminal(self):
+        move_set = move_gen(self.current_board[0], self.current_board[1])
+        if(move_set == 0):
+            return True
+        return False
+
+    def get_next_move_with_random_choice(self):
+        move_set = move_gen(self.current_board[0], self.current_board[1])
 
 
 class MonteCarloTree:
@@ -229,8 +241,13 @@ class MonteCarloTree:
                 return child
         return node
 
-    def default_policy(self, node):
-        pass
+    @staticmethod
+    def default_policy(node):
+        current_state = node.state
+        while not current_state.terminal():
+            current_state = current_state.get_next_move_with_random_choice()
+        final_state_reward = current_state.compute_reward()
+        return final_state_reward
 
     def backup(self, node, reward):
         pass
