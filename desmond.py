@@ -142,7 +142,7 @@ def move_gen(M, O):
 def get_move_list(bit_move):
     move_list = []
     while bit_move != 0:
-        move, next_moves = pop_lsb(bit_move)
+        move, bit_move = pop_lsb(bit_move)
         move_list.append(move)
     return move_list
 
@@ -181,6 +181,9 @@ class Node:
             else:
                 C = 0.0
             first = child.quality_value / child.visited_times
+            print("best:")
+            print(self.visited_times)
+            print(child.visited_times)
             second = 2.0 * math.log(self.visited_times) / child.visited_times
             score = first + C * second
             if score > best_score:
@@ -188,6 +191,7 @@ class Node:
         return best_child
 
     def expand(self):
+        print("expand:0x%x, 0x%x"%(self.state.current_board))
         random_move = self.state.available_moves[self.state.current_step]  # available_moves存储了所有的可行解
         self.state.current_step += 1  # 移动到下一个move
         (curW, curB) = self.state.current_board  # 获得当前棋盘状态
@@ -198,9 +202,11 @@ class Node:
         new_state = State()  # 生成新的State
         new_state.color = self.state.color * -1  # 更新新的State的Color数据
         new_state.current_board = (curB, curW)  # 更新新的State的棋盘数据
-        next_moves = move_gen(curB, curW)  # 生成可行解的移动序列
-        new_state.available_moves = shuffle(get_move_list(next_moves))  # 随机安排move的顺序
+        next_moves = move_gen(curB, curW)  # 生成可行解的移动序
+        new_state.available_moves = get_move_list(next_moves)
+        shuffle(new_state.available_moves)  # 随机安排move的顺序
         new_state.move_from_parent = random_move  # 安排子节点是由父节点的哪个move移动过来的
+        child_node.parent = self
         child_node.state = new_state  # 安排子节点的State为新生成的State
         self.children.append(child_node)  # 把当前新建的节点append到父节点的子节点序列中
         return child_node
@@ -253,10 +259,24 @@ class State:
     def terminal(self):
         first_bitmove = move_gen(self.current_board[0], self.current_board[1])
         second_bitmove = move_gen(self.current_board[1], self.current_board[0])
+       ## print(first_bitmove)
+       # print(second_bitmove)
         return (first_bitmove == 0) & (second_bitmove == 0)
 
     def get_next_move_with_random_choice(self):
-        random_move = random.choice(self.available_moves)
+        print(self.color)
+        if(len(self.available_moves) == 0):
+            self.color = self.color * -1  # 更新新的State的Color数据
+            (curW, curB) = self.current_board  # 获得当前棋盘状态
+            self.current_board = (curB, curW)  # 更新新的State的棋盘数据
+            next_moves = move_gen(curB, curW)  # 生成可行解的移动序列
+            self.available_moves = get_move_list(next_moves)
+            shuffle(self.available_moves)  # 随机安排move的顺序
+            return
+      #  print("move:0x%x, 0x%x"%(self.current_board))
+       # print(self.available_moves)
+        shuffle(self.available_moves)
+        random_move = self.available_moves[0] 
         (curW, curB) = self.current_board  # 获得当前棋盘状态
         flip_mask = flip(curW, curB, random_move)  # 计算当前的move会引起的翻转情况
         curW ^= flip_mask | BIT[random_move]  # 该部分被翻转，并且添加上随机走的子
@@ -264,7 +284,8 @@ class State:
         self.color = self.color * -1  # 更新新的State的Color数据
         self.current_board = (curB, curW)  # 更新新的State的棋盘数据
         next_moves = move_gen(curB, curW)  # 生成可行解的移动序列
-        self.available_moves = shuffle(get_move_list(next_moves))  # 随机安排move的顺序
+        self.available_moves = get_move_list(next_moves)
+        shuffle(self.available_moves)  # 随机安排move的顺序
 
 
 class MonteCarloTree:
@@ -276,6 +297,10 @@ class MonteCarloTree:
 
     def init_tree(self, board, color):
         self.root.state.current_board = to_bitboard(board)  # 将board数据转化成位图数据
+        if color == -1:
+            (self.root.state.current_board[0],
+             self.root.state.current_board[1]) = (self.root.state.current_board[1],
+                                                  self.root.state.current_board[0])
         self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
                                                                  self.root.state.current_board[1]))
         # 生成根节点的所有可行移动
@@ -283,7 +308,7 @@ class MonteCarloTree:
 
     @staticmethod
     def tree_policy(node):
-        while not node.state.terminal:  # 只要当前局面未陷入终止状态，则继续采用Tree_policy
+        while not node.state.terminal():  # 只要当前局面未陷入终止状态，则继续采用Tree_policy
             if node.all_expanded():  # 如果全部展开了，就再向下寻找最优子节点
                 node = node.best_child(True)
             else:
@@ -312,6 +337,7 @@ class MonteCarloTree:
             expand_node = self.tree_policy(node)
             # 2. 随机运行并计算结果
             reward = self.default_policy(expand_node)
+            print("reward:%d"%reward)
             # 3. 更新所有路径上的节点
             self.backup(expand_node, reward)
         best_child = node.best_child(False)
