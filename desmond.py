@@ -137,10 +137,10 @@ def move_gen(M, O):
     # << 9 ：左上， >> 9 : 右下
 
 
-def get_move_list(next_moves):
+def get_move_list(bit_move):
     move_list = []
-    while next_moves != 0:
-        move, next_moves = pop_lsb(next_moves)
+    while bit_move != 0:
+        move, next_moves = pop_lsb(bit_move)
         move_list.append(move)
     return move_list
 
@@ -209,6 +209,17 @@ class State:
         self.current_board = (None, None)  # (My, Opponent's)两个局面
         self.move_from_parent = 0  # 通过父节点的哪个move移动过来的，这里保存的是move的十进制数字编码
 
+    def compute_reward(self):
+        pass
+
+    def terminal(self):
+        bit_move = move_gen(self.current_board[0], self.current_board[1])
+        return bit_move == 0
+
+    def get_next_move_with_random_choice(self):
+        bit_move = move_gen(self.current_board[0], self.current_board[1])
+        move_set = get_move_list(bit_move)
+
 
 class MonteCarloTree:
     def __init__(self):
@@ -227,15 +238,20 @@ class MonteCarloTree:
     @staticmethod
     def tree_policy(node):
         while not node.state.terminal:  # 只要当前局面未陷入终止状态，则继续采用Tree_policy
-            if node.all_expanded():     # 如果全部展开了，就再向下寻找最优子节点
+            if node.all_expanded():  # 如果全部展开了，就再向下寻找最优子节点
                 node = node.best_child(True)
             else:
-                child = node.expand()   # 如果还有没展开的就展开出一个新的节点
-                return child            # Tree_Policy展开获得了当前的节点
+                child = node.expand()  # 如果还有没展开的就展开出一个新的节点
+                return child  # Tree_Policy展开获得了当前的节点
         return node
 
-    def default_policy(self, node):
-        pass
+    @staticmethod
+    def default_policy(node):
+        current_state = node.state
+        while not current_state.terminal():
+            current_state = current_state.get_next_move_with_random_choice()
+        final_state_reward = current_state.compute_reward()
+        return final_state_reward
 
     def backup(self, node, reward):
         pass
