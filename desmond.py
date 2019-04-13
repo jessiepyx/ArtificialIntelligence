@@ -3,7 +3,6 @@ from random import shuffle
 import sys
 import math
 import random
-import copy
 
 FULL_MASK = 0xFFFFFFFF
 RADIAL_MAP = {}
@@ -142,7 +141,7 @@ def move_gen(M, O):
 def get_move_list(bit_move):
     move_list = []
     while bit_move != 0:
-        move, next_moves = pop_lsb(bit_move)
+        move, bit_move = pop_lsb(bit_move)
         move_list.append(move)
     return move_list
 
@@ -154,12 +153,7 @@ def to_move(oct_move):
 def to_bitmove(move):
     return move[0] + 8 * move[1]
 
-def count_bit(b):
-    b -=  (b >> 1) & 0x5555555555555555;
-    b  = (((b >> 2) & 0x3333333333333333) + (b & 0x3333333333333333));
-    b  = ((b >> 4) + b)  & 0x0F0F0F0F0F0F0F0F;
-    return ((b * 0x0101010101010101) & FULL_MASK) >> 56
-    
+
 class Node:
     def __init__(self):
         self.parent = None
@@ -215,40 +209,8 @@ class State:
         self.current_board = (None, None)  # (My, Opponent's)两个局面
         self.move_from_parent = 0  # 通过父节点的哪个move移动过来的，这里保存的是move的十进制数字编码
 
-    WEIGHTS = \
-    [-3, -7, 11, -4, 8, 1, 2]
-    P_RINGS = [0x4281001818008142,
-               0x42000000004200,
-               0x2400810000810024,
-               0x24420000422400,
-               0x1800008181000018,
-               0x18004242001800,
-               0x3C24243C0000]
-    P_CORNER = 0x8100000000000081
-    P_SUB_CORNER = 0x42C300000000C342
-
     def compute_reward(self):
-        W = self.current_board[0]
-        B = self.current_board[1]
-
-        mycorner = count_bit(W & self.P_CORNER)
-        opcorner = count_bit(B & self.P_CORNER)
-
-        # piece difference
-        mypiece = mycorner * 100
-        for i in range(len(self.WEIGHTS)):
-            mypiece += self.WEIGHTS[i] * count_bit(W & self.P_RINGS[i])
-        oppiece = opcorner * 100
-        for i in range(len(self.WEIGHTS)):
-            oppiece += self.WEIGHTS[i] * count_bit(B & self.P_RINGS[i])
-
-#         scorepiece = \
-#             10.0 * mypiece / (mypiece + oppiece) if mypiece > oppiece \
-#             else -10.0 * oppiece / (mypiece + oppiece) if mypiece < oppiece \
-#             else 0
-        scorepiece = mypiece - oppiece
-
-        return scorepiece
+        pass
 
     def terminal(self):
         first_bitmove = move_gen(self.current_board[0], self.current_board[1])
@@ -293,7 +255,7 @@ class MonteCarloTree:
 
     @staticmethod
     def default_policy(node):
-        current_state = copy.deepcopy(node.state)
+        current_state = node.state
         while not current_state.terminal():
             current_state.get_next_move_with_random_choice()
         final_state_reward = current_state.compute_reward()
@@ -328,5 +290,3 @@ class DesmondEngine(Engine):
         mcTree = MonteCarloTree()
         mcTree.init_tree(board, color)
         return to_move(mcTree.tree_search(mcTree.root).move_from_parent)
-
-engine = DesmondEngine
