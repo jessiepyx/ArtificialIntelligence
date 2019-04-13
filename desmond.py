@@ -266,8 +266,6 @@ class State:
         self.available_moves = shuffle(get_move_list(next_moves))  # 随机安排move的顺序
 
 
-
-
 class MonteCarloTree:
     def __init__(self):
         self.budget = 1000  # 计算资源的预算
@@ -300,8 +298,12 @@ class MonteCarloTree:
         final_state_reward = current_state.compute_reward()
         return final_state_reward
 
-    def backup(self, node, reward):
-        pass
+    @staticmethod
+    def backup(node, reward):
+        while node is not None:
+            node.visited_times += 1
+            node.quality_value += reward
+            node = node.parent
 
     def tree_search(self, node):
         for i in range(self.budget):
