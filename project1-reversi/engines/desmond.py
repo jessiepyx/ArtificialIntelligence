@@ -148,7 +148,7 @@ def get_move_list(bit_move):
 
 
 def to_move(oct_move):
-    print("oct_move: %d" % oct_move)
+    # print("oct_move: %d" % oct_move)
     return oct_move % 8, oct_move // 8  # (x,y)
 
 
@@ -177,9 +177,9 @@ class Node:
             else:
                 C = 0.0
             first = child.quality_value / child.visited_times
-            print("best:")
-            print(self.visited_times)
-            print(child.visited_times)
+            # print("best:")
+            # print(self.visited_times)
+            # print(child.visited_times)
             second = 2.0 * math.log(self.visited_times) / child.visited_times
             score = first + C * second
             if score > best_score:
@@ -187,7 +187,7 @@ class Node:
         return best_child
 
     def expand(self):
-        print("expand:0x%x, 0x%x" % (self.state.current_board))
+        # print("expand:0x%x, 0x%x" % (self.state.current_board))
         (curW, curB) = self.state.current_board  # 获得当前棋盘状态
         random_move = None
         if len(self.state.available_moves) != 0:
@@ -257,12 +257,12 @@ class State:
     def terminal(self):
         first_bitmove = move_gen(self.current_board[0], self.current_board[1])
         second_bitmove = move_gen(self.current_board[1], self.current_board[0])
-       ## print(first_bitmove)
-       # print(second_bitmove)
+       ## # print(first_bitmove)
+       # # print(second_bitmove)
         return (first_bitmove == 0) & (second_bitmove == 0)
 
     def get_next_move_with_random_choice(self):
-        print(self.color)
+        # print(self.color)
         if(len(self.available_moves) == 0):
             self.color = self.color * -1  # 更新新的State的Color数据
             (curW, curB) = self.current_board  # 获得当前棋盘状态
@@ -271,8 +271,8 @@ class State:
             self.available_moves = get_move_list(next_moves)
             shuffle(self.available_moves)  # 随机安排move的顺序
             return
-        # print("move:0x%x, 0x%x"%(self.current_board))
-        # print(self.available_moves)
+        # # print("move:0x%x, 0x%x"%(self.current_board))
+        # # print(self.available_moves)
         shuffle(self.available_moves)
         random_move = self.available_moves[0]
         (curW, curB) = self.current_board  # 获得当前棋盘状态
@@ -335,7 +335,7 @@ class MonteCarloTree:
             expand_node = self.tree_policy(node)
             # 2. 随机运行并计算结果
             reward = self.default_policy(expand_node)
-            print("reward:%d"%reward)
+            # print("reward:%d"%reward)
             # 3. 更新所有路径上的节点
             self.backup(expand_node, reward)
         best_child = node.best_child(False)
@@ -352,7 +352,7 @@ class DesmondEngine(Engine):
         mcTree = MonteCarloTree()
         mcTree.init_tree(board, color)
         if mcTree.tree_search(mcTree.root) is None:
-            print("No!!!!!!! No solution!")
+            # print("No!!!!!!! No solution!")
             return None
         else: return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
 
