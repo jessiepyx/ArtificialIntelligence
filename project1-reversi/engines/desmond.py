@@ -288,7 +288,7 @@ class State:
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 5  # 计算资源的预算
+        self.budget = 50  # 计算资源的预算
         self.root = Node()  # 根节点
         new_state = State()  # 根节点的状态
         self.root.state = new_state  # 绑定状态与节点
