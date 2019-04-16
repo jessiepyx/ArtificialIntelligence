@@ -152,6 +152,8 @@ def to_move(oct_move):
     # print("oct_move: %d" % oct_move)
     return oct_move % 8, oct_move // 8  # (x,y)
 
+# todo: 这以上都不用检查了
+
 
 def to_bitmove(move):
     return move[0] + 8 * move[1]
@@ -185,6 +187,7 @@ class Node:
             score = first + C * math.sqrt(second)
             if score > best_score:
                 best_child = child
+                best_score = score
         return best_child
 
     def expand(self):
@@ -195,7 +198,7 @@ class Node:
             random_move = self.state.available_moves[self.state.current_step]  # available_moves存储了所有的可行解
             self.state.current_step += 1  # 移动到下一个move
             flip_mask = flip(curW, curB, random_move)  # 计算当前的move会引起的翻转情况
-            curW ^= flip_mask | BIT[random_move]  # 该部分被翻转，并且添加上随机走的子
+            curW ^= (flip_mask | BIT[random_move])  # 该部分被翻转，并且添加上随机走的子
             curB ^= flip_mask  # 该部分被翻转
         child_node = Node()  # 生成新的子节点
         new_state = State()  # 生成新的State
@@ -254,7 +257,7 @@ class State:
     P_CORNER = 0x8100000000000081
     P_SUB_CORNER = 0x42C300000000C342
 
-    def compute_reward(self):
+    def compute_reward(self, root_color, current_color):
         W = self.current_board[0]
         B = self.current_board[1]
 
@@ -275,7 +278,8 @@ class State:
         #             else 0
         scorepiece = mypiece - oppiece
 
-        return scorepiece
+        return scorepiece * root_color * current_color
+        # 这里计算出的代价是白色方的收益，如果当前颜色和root颜色相同，则说明当前执白
 
     def terminal(self):
         first_bitmove = move_gen(self.current_board[0], self.current_board[1])
@@ -311,17 +315,14 @@ class State:
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 50  # 计算资源的预算
+        self.budget = 40  # 计算资源的预算
         self.root = Node()  # 根节点
         new_state = State()  # 根节点的状态
         self.root.state = new_state  # 绑定状态与节点
 
     def init_tree(self, board, color):
         self.root.state.current_board = to_bitboard(board)  # 将board数据转化成位图数据
-        if color == -1:
-            (self.root.state.current_board[0],
-             self.root.state.current_board[1]) = (self.root.state.current_board[1],
-                                                  self.root.state.current_board[0])
+        # 这里默认root对应的board中，我方执白
         self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
                                                                  self.root.state.current_board[1]))
         shuffle(self.root.state.available_moves)
@@ -338,16 +339,14 @@ class MonteCarloTree:
                 return child  # Tree_Policy展开获得了当前的节点
         return node
 
-    @staticmethod
-    def default_policy(node):
+    def default_policy(self, node):
         current_state = copy.deepcopy(node.state)
         while not current_state.terminal():
             current_state.get_next_move_with_random_choice()
-        final_state_reward = current_state.compute_reward()
+        final_state_reward = current_state.compute_reward(self.root.state.color, current_state.color)
         return final_state_reward
 
-    @staticmethod
-    def backup(node, reward):
+    def backup(self, node, reward):
         while node is not None:
             node.visited_times += 1
             node.quality_value += reward
@@ -376,7 +375,6 @@ class DesmondEngine(Engine):
         mcTree = MonteCarloTree()
         mcTree.init_tree(board, color)
         if mcTree.tree_search(mcTree.root) is None:
-            # print("No!!!!!!! No solution!")
             return None
         else:
             return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
