@@ -1,3 +1,4 @@
+# coding=utf-8
 from engines import Engine
 from random import shuffle
 import sys
@@ -181,7 +182,7 @@ class Node:
             # print(self.visited_times)
             # print(child.visited_times)
             second = 2.0 * math.log(self.visited_times) / child.visited_times
-            score = first + C * second
+            score = first + C * math.sqrt(second)
             if score > best_score:
                 best_child = child
         return best_child
@@ -213,7 +214,6 @@ class Node:
 class State:
     def __init__(self):
         self.color = 1  # 1: 白棋， -1：黑棋
-        self.value = 0.0
         self.available_moves = []  # 可行移动操作序列
         self.current_step = 0  # 当前已经尝试过哪些可行移动操作序列
         self.current_board = (None, None)  # (My, Opponent's)两个局面
@@ -286,7 +286,7 @@ class State:
 
     def get_next_move_with_random_choice(self):
         # print(self.color)
-        if(len(self.available_moves) == 0):
+        if len(self.available_moves) == 0:
             self.color = self.color * -1  # 更新新的State的Color数据
             (curW, curB) = self.current_board  # 获得当前棋盘状态
             self.current_board = (curB, curW)  # 更新新的State的棋盘数据
@@ -324,6 +324,7 @@ class MonteCarloTree:
                                                   self.root.state.current_board[0])
         self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
                                                                  self.root.state.current_board[1]))
+        shuffle(self.root.state.available_moves)
         # 生成根节点的所有可行移动
         self.root.state.color = color  # 标记当前颜色
 
@@ -353,7 +354,7 @@ class MonteCarloTree:
             node = node.parent
 
     def tree_search(self, node):
-        for i in range(self.budget):
+        for _ in range(self.budget):
             # 1. 寻找最优节点进行展开
             expand_node = self.tree_policy(node)
             # 2. 随机运行并计算结果
@@ -377,7 +378,8 @@ class DesmondEngine(Engine):
         if mcTree.tree_search(mcTree.root) is None:
             # print("No!!!!!!! No solution!")
             return None
-        else: return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
+        else:
+            return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
 
 
 engine = DesmondEngine

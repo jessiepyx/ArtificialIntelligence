@@ -181,7 +181,7 @@ class Node:
             # print(self.visited_times)
             # print(child.visited_times)
             second = 2.0 * math.log(self.visited_times) / child.visited_times
-            score = first + C * second
+            score = first + C * math.sqrt(second)
             if score > best_score:
                 best_child = child
         return best_child
@@ -325,6 +325,7 @@ class MonteCarloTree:
                                                   self.root.state.current_board[0])
         self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
                                                                  self.root.state.current_board[1]))
+        shuffle(self.root.state.available_moves)
         # 生成根节点的所有可行移动
         self.root.state.color = color  # 标记当前颜色
 
