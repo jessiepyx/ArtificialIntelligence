@@ -265,18 +265,20 @@ class State:
         opcorner = bit_count(B & self.P_CORNER)
 
         # piece difference
-        mypiece = mycorner * 100
-        for i in range(len(self.WEIGHTS)):
-            mypiece += self.WEIGHTS[i] * bit_count(W & self.P_RINGS[i])
-        oppiece = opcorner * 100
-        for i in range(len(self.WEIGHTS)):
-            oppiece += self.WEIGHTS[i] * bit_count(B & self.P_RINGS[i])
+        mypiece = bit_count(W)
+        oppiece = bit_count(B)
+        # mypiece = mycorner * 100
+        # for i in range(len(self.WEIGHTS)):
+        #     mypiece += self.WEIGHTS[i] * bit_count(W & self.P_RINGS[i])
+        # oppiece = opcorner * 100
+        # for i in range(len(self.WEIGHTS)):
+        #     oppiece += self.WEIGHTS[i] * bit_count(B & self.P_RINGS[i])
 
         # scorepiece = \
         #             10.0 * mypiece / (mypiece + oppiece) if mypiece > oppiece \
         #             else -10.0 * oppiece / (mypiece + oppiece) if mypiece < oppiece \
         #             else 0
-        scorepiece = mypiece - oppiece
+        scorepiece = (mypiece > oppiece) + (mypiece < oppiece) * -1
 
         return scorepiece * root_color * current_color
 
@@ -315,7 +317,7 @@ class State:
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 80  # 计算资源的预算
+        self.budget = 100  # 计算资源的预算
         self.root = Node()  # 根节点
         new_state = State()  # 根节点的状态
         self.root.state = new_state  # 绑定状态与节点
