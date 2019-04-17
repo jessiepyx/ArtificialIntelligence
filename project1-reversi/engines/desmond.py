@@ -278,8 +278,8 @@ class State:
         #             else 0
         scorepiece = mypiece - oppiece
 
-        return scorepiece * current_color
-        # 这里计算出的代价是白色方的收益，如果当前颜色和root颜色相同，则说明当前执白
+        return scorepiece * root_color * current_color
+
 
     def terminal(self):
         first_bitmove = move_gen(self.current_board[0], self.current_board[1])
@@ -315,7 +315,7 @@ class State:
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 200  # 计算资源的预算
+        self.budget = 80  # 计算资源的预算
         self.root = Node()  # 根节点
         new_state = State()  # 根节点的状态
         self.root.state = new_state  # 绑定状态与节点
@@ -323,12 +323,12 @@ class MonteCarloTree:
     def init_tree(self, board, color):
         self.root.state.current_board = to_bitboard(board)  # 将board数据转化成位图数据
         # 判断颜色并交换
-        if color == 1:
-            self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
+        if color == -1:
+            self.root.state.current_board = (self.root.state.current_board[1],
+                                             self.root.state.current_board[0])
+        # 如果根的color == -1，那么把黑色当成白色
+        self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
                                                                  self.root.state.current_board[1]))
-        else:
-            self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[1],
-                                                                 self.root.state.current_board[0]))
         shuffle(self.root.state.available_moves)
         # 生成根节点的所有可行移动
         self.root.state.color = color  # 标记当前颜色
