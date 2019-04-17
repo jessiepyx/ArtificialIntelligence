@@ -230,7 +230,8 @@ class State:
         mypiece = bit_count(W)
         oppiece = bit_count(B)
 
-        scorepiece = (mypiece > oppiece) + (mypiece < oppiece) * -1
+        # scorepiece = (mypiece > oppiece) + (mypiece < oppiece) * -1
+        scorepiece = mypiece - oppiece
 
         return scorepiece * root_color * current_color
 
@@ -328,11 +329,29 @@ class DesmondEngine(Engine):
         fill_bit_table()
         fill_radial_map()
         self.alpha_beta = False
-        self.depth = 11
+        self.depth = 8
 
     def get_move(self, board, color, move_num=None,
                  time_remaining=None, time_opponent=None):
-        if move_num > 50:  # 最后十步minimax
+        # 简单开局定式
+        if move_num == 0:
+            if color < 0:
+                return 5, 3
+            else:  # 对角开局
+                if board[2][4] == -1 or board[3][5] == -1:
+                    return 2, 5
+                if board[4][2] == -1 or board[5][3] == -1:
+                    return 5, 2
+        # if move_num == 1:
+        #     if color < 0:
+        #         if board[3][2] == 1:  # 对手垂直开局
+        #             return 2, 3
+        #         if board[5][2] == 1:  # 对手对角开局
+        #             return 4, 2
+        #         if board[5][4] == 1:  # 对手平行开局
+        #             return 4, 5
+        # 最后六步minimax
+        if move_num > 24:
             W, B = to_bitboard(board)
 
             wb = (W, B) if color > 0 else (B, W)
@@ -342,13 +361,13 @@ class DesmondEngine(Engine):
             else:
                 res = self.minimax(wb[0], wb[1], self.depth)
             return to_move(res[1])
-        else:  # MCTS
-            mcTree = MonteCarloTree()
-            mcTree.init_tree(board, color)
-            if mcTree.tree_search(mcTree.root) is None:
-                return None
-            else:
-                return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
+        # MCTS
+        mcTree = MonteCarloTree()
+        mcTree.init_tree(board, color)
+        if mcTree.tree_search(mcTree.root) is None:
+            return None
+        else:
+            return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
 
     def minimax(self, W, B, depth):
         if depth == 0:
@@ -418,23 +437,23 @@ class DesmondEngine(Engine):
     P_SUB_CORNER = 0x42C300000000C342
 
     def eval(self, W, B):
-        mycorner = count_bit(W & self.P_CORNER)
-        opcorner = count_bit(B & self.P_CORNER)
+        # mycorner = count_bit(W & self.P_CORNER)
+        # opcorner = count_bit(B & self.P_CORNER)
 
         # piece difference
-        mypiece = mycorner * 100
-        for i in range(len(self.WEIGHTS)):
-            mypiece += self.WEIGHTS[i] * count_bit(W & self.P_RINGS[i])
-        oppiece = opcorner * 100
-        for i in range(len(self.WEIGHTS)):
-            oppiece += self.WEIGHTS[i] * count_bit(B & self.P_RINGS[i])
+        # mypiece = mycorner * 100
+        # for i in range(len(self.WEIGHTS)):
+        #     mypiece += self.WEIGHTS[i] * count_bit(W & self.P_RINGS[i])
+        # oppiece = opcorner * 100
+        # for i in range(len(self.WEIGHTS)):
+        #     oppiece += self.WEIGHTS[i] * count_bit(B & self.P_RINGS[i])
 
         #         scorepiece = \
         #             10.0 * mypiece / (mypiece + oppiece) if mypiece > oppiece \
         #             else -10.0 * oppiece / (mypiece + oppiece) if mypiece < oppiece \
         #             else 0
-        # mypiece = bit_count(W)
-        # oppiece = bit_count(B)
+        mypiece = bit_count(W)
+        oppiece = bit_count(B)
         scorepiece = mypiece - oppiece
 
         return scorepiece

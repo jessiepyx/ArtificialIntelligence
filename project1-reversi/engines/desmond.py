@@ -278,7 +278,8 @@ class State:
         #             10.0 * mypiece / (mypiece + oppiece) if mypiece > oppiece \
         #             else -10.0 * oppiece / (mypiece + oppiece) if mypiece < oppiece \
         #             else 0
-        scorepiece = (mypiece > oppiece) + (mypiece < oppiece) * -1
+        # scorepiece = (mypiece > oppiece) + (mypiece < oppiece) * -1
+        scorepiece = mypiece - oppiece
 
         return scorepiece * root_color * current_color
 
