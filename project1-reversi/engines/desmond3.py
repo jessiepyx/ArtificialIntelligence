@@ -1,3 +1,4 @@
+# coding=utf-8
 from engines import Engine
 from random import shuffle
 import sys
@@ -151,6 +152,8 @@ def to_move(oct_move):
     # print("oct_move: %d" % oct_move)
     return oct_move % 8, oct_move // 8  # (x,y)
 
+# todo: 这以上都不用检查了
+
 
 def to_bitmove(move):
     return move[0] + 8 * move[1]
@@ -184,6 +187,7 @@ class Node:
             score = first + C * math.sqrt(second)
             if score > best_score:
                 best_child = child
+                best_score = score
         return best_child
 
     def expand(self):
@@ -194,7 +198,7 @@ class Node:
             random_move = self.state.available_moves[self.state.current_step]  # available_moves存储了所有的可行解
             self.state.current_step += 1  # 移动到下一个move
             flip_mask = flip(curW, curB, random_move)  # 计算当前的move会引起的翻转情况
-            curW ^= flip_mask | BIT[random_move]  # 该部分被翻转，并且添加上随机走的子
+            curW ^= (flip_mask | BIT[random_move])  # 该部分被翻转，并且添加上随机走的子
             curB ^= flip_mask  # 该部分被翻转
         child_node = Node()  # 生成新的子节点
         new_state = State()  # 生成新的State
@@ -213,7 +217,6 @@ class Node:
 class State:
     def __init__(self):
         self.color = 1  # 1: 白棋， -1：黑棋
-        self.value = 0.0
         self.available_moves = []  # 可行移动操作序列
         self.current_step = 0  # 当前已经尝试过哪些可行移动操作序列
         self.current_board = (None, None)  # (My, Opponent's)两个局面
@@ -229,33 +232,32 @@ class State:
     1 . . . . . . 1    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .
     . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .    . . . . . . . .
     
-          -3                 -10                 11                -4
+          -3                 -7                  11                -4
           
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
-    . . . . . . . .    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .
-    . . . . . . . .    . . . . . . . .    . . . 1 1 . . .    . . 1 . . 1 . .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .    . . . . . . . .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .    . . . . . . . .
-    . . . . . . . .    . . . . . . . .    . . . 1 1 . . .    . . 1 . . 1 . .
-    . . . . . . . .    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
+    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .
+    . . . . . . . .    . . . 1 1 . . .    . . . . . . . .
+    . . . . . . . .    . . . . . . . .    . . 1 1 1 1 . .
+    1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .
+    1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .
+    . . . . . . . .    . . . . . . . .    . . 1 1 1 1 . .
+    . . . . . . . .    . . . 1 1 . . .    . . . . . . . .
+    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .
     
-           8                 -1                  2                  5
+           8                  1                  2
     '''
     WEIGHTS = \
-        [-3, -10, 11, -4, 8, -1, 2, 5]
+        [-3, -7, 11, -4, 8, 1, 2]
     P_RINGS = [0x4281001818008142,
-               0x0042000000004200,
+               0x42000000004200,
                0x2400810000810024,
-               0x0024420000422400,
+               0x24420000422400,
                0x1800008181000018,
-               0x0018004242001800,
-               0x0000182424180000,
-               0x0000240000240000]
+               0x18004242001800,
+               0x3C24243C0000]
     P_CORNER = 0x8100000000000081
     P_SUB_CORNER = 0x42C300000000C342
 
-    def compute_reward(self):
+    def compute_reward(self, root_color, current_color):
         W = self.current_board[0]
         B = self.current_board[1]
 
@@ -276,7 +278,8 @@ class State:
         #             else 0
         scorepiece = mypiece - oppiece
 
-        return scorepiece
+        return scorepiece * current_color
+        # 这里计算出的代价是白色方的收益，如果当前颜色和root颜色相同，则说明当前执白
 
     def terminal(self):
         first_bitmove = move_gen(self.current_board[0], self.current_board[1])
@@ -287,7 +290,7 @@ class State:
 
     def get_next_move_with_random_choice(self):
         # print(self.color)
-        if(len(self.available_moves) == 0):
+        if len(self.available_moves) == 0:
             self.color = self.color * -1  # 更新新的State的Color数据
             (curW, curB) = self.current_board  # 获得当前棋盘状态
             self.current_board = (curB, curW)  # 更新新的State的棋盘数据
@@ -312,19 +315,20 @@ class State:
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 100  # 计算资源的预算
+        self.budget = 40  # 计算资源的预算
         self.root = Node()  # 根节点
         new_state = State()  # 根节点的状态
         self.root.state = new_state  # 绑定状态与节点
 
     def init_tree(self, board, color):
         self.root.state.current_board = to_bitboard(board)  # 将board数据转化成位图数据
-        if color == -1:
-            (self.root.state.current_board[0],
-             self.root.state.current_board[1]) = (self.root.state.current_board[1],
-                                                  self.root.state.current_board[0])
-        self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
+        # 判断颜色并交换
+        if color == 1:
+            self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
                                                                  self.root.state.current_board[1]))
+        else:
+            self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[1],
+                                                                 self.root.state.current_board[0]))
         shuffle(self.root.state.available_moves)
         # 生成根节点的所有可行移动
         self.root.state.color = color  # 标记当前颜色
@@ -339,23 +343,21 @@ class MonteCarloTree:
                 return child  # Tree_Policy展开获得了当前的节点
         return node
 
-    @staticmethod
-    def default_policy(node):
+    def default_policy(self, node):
         current_state = copy.deepcopy(node.state)
         while not current_state.terminal():
             current_state.get_next_move_with_random_choice()
-        final_state_reward = current_state.compute_reward()
+        final_state_reward = current_state.compute_reward(self.root.state.color, current_state.color)
         return final_state_reward
 
-    @staticmethod
-    def backup(node, reward):
+    def backup(self, node, reward):
         while node is not None:
             node.visited_times += 1
             node.quality_value += reward
             node = node.parent
 
     def tree_search(self, node):
-        for i in range(self.budget):
+        for _ in range(self.budget):
             # 1. 寻找最优节点进行展开
             expand_node = self.tree_policy(node)
             # 2. 随机运行并计算结果
@@ -377,9 +379,9 @@ class DesmondEngine(Engine):
         mcTree = MonteCarloTree()
         mcTree.init_tree(board, color)
         if mcTree.tree_search(mcTree.root) is None:
-            # print("No!!!!!!! No solution!")
             return None
-        else: return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
+        else:
+            return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
 
 
 engine = DesmondEngine
