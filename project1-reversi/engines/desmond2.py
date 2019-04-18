@@ -30,6 +30,40 @@ SQ_DIR = \
      0, 0, 5, 5, 5, 5, 1, 1,
      0, 0, 5, 5, 5, 5, 1, 1]
 
+'''
+. 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .    . . . . . . . .
+1 . . . . . . 1    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .
+. . . . . . . .    . . . . . . . .    1 . . . . . . 1    . 1 . . . . 1 .
+. . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
+. . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
+. . . . . . . .    . . . . . . . .    1 . . . . . . 1    . 1 . . . . 1 .
+1 . . . . . . 1    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .
+. 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .    . . . . . . . .
+
+      -3                 -7                  11                -4
+
+. . . 1 1 . . .    . . . . . . . .    . . . . . . . .
+. . . . . . . .    . . . 1 1 . . .    . . . . . . . .
+. . . . . . . .    . . . . . . . .    . . 1 1 1 1 . .
+1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .
+1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .
+. . . . . . . .    . . . . . . . .    . . 1 1 1 1 . .
+. . . . . . . .    . . . 1 1 . . .    . . . . . . . .
+. . . 1 1 . . .    . . . . . . . .    . . . . . . . .
+
+       8                  1                  2
+'''
+WEIGHTS = \
+    [-3, -7, 11, -4, 8, 1, 2]
+P_RINGS = [0x4281001818008142,
+           0x42000000004200,
+           0x2400810000810024,
+           0x24420000422400,
+           0x1800008181000018,
+           0x18004242001800,
+           0x3C24243C0000]
+P_CORNER = 0x8100000000000081
+P_SUB_CORNER = 0x42C300000000C342
 
 def fill_radial_map():
     for dir, dir_mv in list(RADIAL_BASE.items()):
@@ -176,7 +210,8 @@ class Node:
         # UCB算法
         for child in self.children:
             if is_exploration:
-                C = 1 / math.sqrt(2.0)
+                # C = 1 / math.sqrt(2.0)
+                C = 0.5
             else:
                 C = 0.0
             first = child.quality_value / child.visited_times
@@ -231,7 +266,8 @@ class State:
         oppiece = bit_count(B)
 
         # scorepiece = (mypiece > oppiece) + (mypiece < oppiece) * -1
-        scorepiece = mypiece - oppiece
+        # scorepiece = mypiece - oppiece
+        scorepiece = (mypiece > oppiece) * mypiece - (mypiece < oppiece) * oppiece  # 按赢家的子数计分
 
         return scorepiece * root_color * current_color
 
@@ -270,7 +306,7 @@ class State:
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 100  # 计算资源的预算
+        self.budget = 800  # 计算资源的预算
         self.root = Node()  # 根节点
         new_state = State()  # 根节点的状态
         self.root.state = new_state  # 绑定状态与节点
@@ -344,44 +380,46 @@ class DesmondEngine(Engine):
                     return 2, 5
                 if board[4][2] == -1 or board[5][3] == -1:
                     return 5, 2
-        # if move_num == 1:
-        #     if color < 0:
-        #         if board[3][2] == 1:  # 对手垂直开局
-        #             return 2, 3
-        #         if board[5][2] == 1:  # 对手对角开局
-        #             return 4, 2
-        #         if board[5][4] == 1:  # 对手平行开局
-        #             return 4, 5
+        if move_num == 1:
+            if color < 0:
+                if board[3][2] == 1:  # 对手垂直开局
+                    return 2, 3
+                if board[5][2] == 1:  # 对手对角开局
+                    return 4, 2
+                if board[5][4] == 1:  # 对手平行开局
+                    return 4, 5
 
         W, B = to_bitboard(board)
         wb = (W, B) if color > 0 else (B, W)
         available_moves = move_gen(wb[0], wb[1])
 
         # 首选让对手无路可走的棋
-        tmp_move_list = get_move_list(available_moves)
-        shuffle(tmp_move_list)  # 随机打乱
-        for move in tmp_move_list:
-            flip_mask = flip(wb[0], wb[1], move)
-            tmpW = wb[0] ^ (flip_mask | BIT[move])
-            tmpB = wb[1] ^ flip_mask
-            if move_gen(tmpB, tmpW) == 0:
-                print('freeze')
-                return to_move(move)
+        if move_num < 26:
+            tmp_move_list = get_move_list(available_moves)
+            shuffle(tmp_move_list)  # 随机打乱
+            for move in tmp_move_list:
+                flip_mask = flip(wb[0], wb[1], move)
+                tmpW = wb[0] ^ (flip_mask | BIT[move])
+                tmpB = wb[1] ^ flip_mask
+                if move_gen(tmpB, tmpW) == 0:
+                    print(move_num, 'freeze')
+                    return to_move(move)
 
         # 其次选占角
-        corner_move_list = get_move_list(available_moves & self.P_CORNER)
-        if corner_move_list:
-            shuffle(corner_move_list)  # 随机打乱
-            print('corner', to_move(corner_move_list[0]))
-            return to_move(corner_move_list[0])
+        if move_num < 10:
+            corner_move_list = get_move_list(available_moves & P_CORNER)
+            if corner_move_list:
+                shuffle(corner_move_list)  # 随机打乱
+                print(move_num, 'corner', to_move(corner_move_list[0]))
+                return to_move(corner_move_list[0])
 
         # 收官六步minimax
-        if move_num > 24:
-            if self.alpha_beta:
-                res = self.alphabeta(wb[0], wb[1], self.depth, -float("inf"), float("inf"))
-            else:
-                res = self.minimax(wb[0], wb[1], self.depth)
-            return to_move(res[1])
+        # if move_num > 24:
+        #     if self.alpha_beta:
+        #         res = self.alphabeta(wb[0], wb[1], self.depth, -float("inf"), float("inf"))
+        #     else:
+        #         res = self.minimax(wb[0], wb[1], self.depth)
+        #     return to_move(res[1])
 
         # Todo: 判断下一步对方走棋后，我方是否会出现无棋可走的局面，如果是，则直接剪枝（？）
 
@@ -425,41 +463,6 @@ class DesmondEngine(Engine):
         # print "color", "white" if color == 1 else "black", "depth", depth, "best", best, "legals", len(movelist)
         return (best, bestmv)
 
-    '''
-    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .    . . . . . . . .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .
-    . . . . . . . .    . . . . . . . .    1 . . . . . . 1    . 1 . . . . 1 .
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
-    . . . . . . . .    . . . . . . . .    1 . . . . . . 1    . 1 . . . . 1 .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .
-    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .    . . . . . . . .
-
-          -3                 -7                  11                -4
-
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .
-    . . . . . . . .    . . . 1 1 . . .    . . . . . . . .
-    . . . . . . . .    . . . . . . . .    . . 1 1 1 1 . .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .
-    . . . . . . . .    . . . . . . . .    . . 1 1 1 1 . .
-    . . . . . . . .    . . . 1 1 . . .    . . . . . . . .
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .
-
-           8                  1                  2
-    '''
-    WEIGHTS = \
-        [-3, -7, 11, -4, 8, 1, 2]
-    P_RINGS = [0x4281001818008142,
-               0x42000000004200,
-               0x2400810000810024,
-               0x24420000422400,
-               0x1800008181000018,
-               0x18004242001800,
-               0x3C24243C0000]
-    P_CORNER = 0x8100000000000081
-    P_SUB_CORNER = 0x42C300000000C342
-
     def eval(self, W, B):
         # mycorner = count_bit(W & self.P_CORNER)
         # opcorner = count_bit(B & self.P_CORNER)
@@ -478,7 +481,8 @@ class DesmondEngine(Engine):
         #             else 0
         mypiece = bit_count(W)
         oppiece = bit_count(B)
-        scorepiece = mypiece - oppiece
+        # scorepiece = mypiece - oppiece
+        scorepiece = (mypiece > oppiece) * mypiece - (mypiece < oppiece) * oppiece  # 按赢家的子数计分
 
         return scorepiece
 

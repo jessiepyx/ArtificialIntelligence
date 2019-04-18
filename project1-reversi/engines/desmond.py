@@ -279,7 +279,8 @@ class State:
         #             else -10.0 * oppiece / (mypiece + oppiece) if mypiece < oppiece \
         #             else 0
         # scorepiece = (mypiece > oppiece) + (mypiece < oppiece) * -1
-        scorepiece = mypiece - oppiece
+        # scorepiece = mypiece - oppiece
+        scorepiece = (mypiece > oppiece) * mypiece - (mypiece < oppiece) * oppiece  # 按赢家的子数计分
 
         return scorepiece * root_color * current_color
 
@@ -318,7 +319,7 @@ class State:
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 100  # 计算资源的预算
+        self.budget = 800  # 计算资源的预算
         self.root = Node()  # 根节点
         new_state = State()  # 根节点的状态
         self.root.state = new_state  # 绑定状态与节点
