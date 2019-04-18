@@ -129,9 +129,9 @@ def move_gen_sub(P, mask, dir):
 def move_gen(M, O):
     # 生成我的合法下子位置
     mask = O & 0x7E7E7E7E7E7E7E7E  # mask是O去掉左右两列的结果
-    return ((move_gen_sub(M, mask, 1) \
-             | move_gen_sub(M, O, 8) \
-             | move_gen_sub(M, mask, 7) \
+    return ((move_gen_sub(M, mask, 1)
+             | move_gen_sub(M, O, 8)
+             | move_gen_sub(M, mask, 7)
              | move_gen_sub(M, mask, 9)) & ~(M | O)) & FULL_MASK  # 弃掉两端是因为两端移动一位以后结果不正确。
     # 去掉已经被占据的格子
     # << 1 : 所有格子向左移动一位，>> 1 : 所有格子向右移动一位
@@ -333,6 +333,8 @@ class DesmondEngine(Engine):
 
     def get_move(self, board, color, move_num=None,
                  time_remaining=None, time_opponent=None):
+        # print(move_num)
+
         # 简单开局定式
         if move_num == 0:
             if color < 0:
@@ -350,18 +352,40 @@ class DesmondEngine(Engine):
         #             return 4, 2
         #         if board[5][4] == 1:  # 对手平行开局
         #             return 4, 5
-        # 最后六步minimax
+
+        W, B = to_bitboard(board)
+        wb = (W, B) if color > 0 else (B, W)
+        available_moves = move_gen(wb[0], wb[1])
+
+        # 首选让对手无路可走的棋
+        tmp_move_list = get_move_list(available_moves)
+        shuffle(tmp_move_list)  # 随机打乱
+        for move in tmp_move_list:
+            flip_mask = flip(wb[0], wb[1], move)
+            tmpW = wb[0] ^ (flip_mask | BIT[move])
+            tmpB = wb[1] ^ flip_mask
+            if move_gen(tmpB, tmpW) == 0:
+                print('freeze')
+                return to_move(move)
+
+        # 其次选占角
+        corner_move_list = get_move_list(available_moves & self.P_CORNER)
+        if corner_move_list:
+            shuffle(corner_move_list)  # 随机打乱
+            print('corner', to_move(corner_move_list[0]))
+            return to_move(corner_move_list[0])
+
+        # 收官六步minimax
         if move_num > 24:
-            W, B = to_bitboard(board)
-
-            wb = (W, B) if color > 0 else (B, W)
-
             if self.alpha_beta:
                 res = self.alphabeta(wb[0], wb[1], self.depth, -float("inf"), float("inf"))
             else:
                 res = self.minimax(wb[0], wb[1], self.depth)
             return to_move(res[1])
-        # MCTS
+
+        # Todo: 判断下一步对方走棋后，我方是否会出现无棋可走的局面，如果是，则直接剪枝（？）
+
+        # 主体部分MCTS
         mcTree = MonteCarloTree()
         mcTree.init_tree(board, color)
         if mcTree.tree_search(mcTree.root) is None:
