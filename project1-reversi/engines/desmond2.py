@@ -1,3 +1,4 @@
+# coding=utf-8
 from engines import Engine
 from random import shuffle
 import sys
@@ -29,6 +30,40 @@ SQ_DIR = \
      0, 0, 5, 5, 5, 5, 1, 1,
      0, 0, 5, 5, 5, 5, 1, 1]
 
+'''
+. 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .    . . . . . . . .
+1 . . . . . . 1    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .
+. . . . . . . .    . . . . . . . .    1 . . . . . . 1    . 1 . . . . 1 .
+. . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
+. . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
+. . . . . . . .    . . . . . . . .    1 . . . . . . 1    . 1 . . . . 1 .
+1 . . . . . . 1    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .
+. 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .    . . . . . . . .
+
+      -3                 -7                  11                -4
+
+. . . 1 1 . . .    . . . . . . . .    . . . . . . . .
+. . . . . . . .    . . . 1 1 . . .    . . . . . . . .
+. . . . . . . .    . . . . . . . .    . . 1 1 1 1 . .
+1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .
+1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .
+. . . . . . . .    . . . . . . . .    . . 1 1 1 1 . .
+. . . . . . . .    . . . 1 1 . . .    . . . . . . . .
+. . . 1 1 . . .    . . . . . . . .    . . . . . . . .
+
+       8                  1                  2
+'''
+WEIGHTS = \
+    [-3, -7, 11, -4, 8, 1, 2]
+P_RINGS = [0x4281001818008142,
+           0x42000000004200,
+           0x2400810000810024,
+           0x24420000422400,
+           0x1800008181000018,
+           0x18004242001800,
+           0x3C24243C0000]
+P_CORNER = 0x8100000000000081
+P_SUB_CORNER = 0x42C300000000C342
 
 def fill_radial_map():
     for dir, dir_mv in list(RADIAL_BASE.items()):
@@ -128,9 +163,9 @@ def move_gen_sub(P, mask, dir):
 def move_gen(M, O):
     # 生成我的合法下子位置
     mask = O & 0x7E7E7E7E7E7E7E7E  # mask是O去掉左右两列的结果
-    return ((move_gen_sub(M, mask, 1) \
-             | move_gen_sub(M, O, 8) \
-             | move_gen_sub(M, mask, 7) \
+    return ((move_gen_sub(M, mask, 1)
+             | move_gen_sub(M, O, 8)
+             | move_gen_sub(M, mask, 7)
              | move_gen_sub(M, mask, 9)) & ~(M | O)) & FULL_MASK  # 弃掉两端是因为两端移动一位以后结果不正确。
     # 去掉已经被占据的格子
     # << 1 : 所有格子向左移动一位，>> 1 : 所有格子向右移动一位
@@ -150,6 +185,8 @@ def get_move_list(bit_move):
 def to_move(oct_move):
     # print("oct_move: %d" % oct_move)
     return oct_move % 8, oct_move // 8  # (x,y)
+
+# todo: 这以上都不用检查了
 
 
 def to_bitmove(move):
@@ -173,7 +210,8 @@ class Node:
         # UCB算法
         for child in self.children:
             if is_exploration:
-                C = 1 / math.sqrt(2.0)
+                # C = 1 / math.sqrt(2.0)
+                C = 0.5
             else:
                 C = 0.0
             first = child.quality_value / child.visited_times
@@ -184,6 +222,7 @@ class Node:
             score = first + C * math.sqrt(second)
             if score > best_score:
                 best_child = child
+                best_score = score
         return best_child
 
     def expand(self):
@@ -194,7 +233,7 @@ class Node:
             random_move = self.state.available_moves[self.state.current_step]  # available_moves存储了所有的可行解
             self.state.current_step += 1  # 移动到下一个move
             flip_mask = flip(curW, curB, random_move)  # 计算当前的move会引起的翻转情况
-            curW ^= flip_mask | BIT[random_move]  # 该部分被翻转，并且添加上随机走的子
+            curW ^= (flip_mask | BIT[random_move])  # 该部分被翻转，并且添加上随机走的子
             curB ^= flip_mask  # 该部分被翻转
         child_node = Node()  # 生成新的子节点
         new_state = State()  # 生成新的State
@@ -213,70 +252,25 @@ class Node:
 class State:
     def __init__(self):
         self.color = 1  # 1: 白棋， -1：黑棋
-        self.value = 0.0
         self.available_moves = []  # 可行移动操作序列
         self.current_step = 0  # 当前已经尝试过哪些可行移动操作序列
         self.current_board = (None, None)  # (My, Opponent's)两个局面
         self.move_from_parent = 0  # 通过父节点的哪个move移动过来的，这里保存的是move的十进制数字编码
 
-    '''
-    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .    . . . . . . . .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .
-    . . . . . . . .    . . . . . . . .    1 . . . . . . 1    . 1 . . . . 1 .
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
-    . . . . . . . .    . . . . . . . .    1 . . . . . . 1    . 1 . . . . 1 .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .
-    . 1 . . . . 1 .    . . . . . . . .    . . 1 . . 1 . .    . . . . . . . .
-    
-          -3                 -10                 11                -4
-          
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
-    . . . . . . . .    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .
-    . . . . . . . .    . . . . . . . .    . . . 1 1 . . .    . . 1 . . 1 . .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .    . . . . . . . .
-    1 . . . . . . 1    . 1 . . . . 1 .    . . 1 . . 1 . .    . . . . . . . .
-    . . . . . . . .    . . . . . . . .    . . . 1 1 . . .    . . 1 . . 1 . .
-    . . . . . . . .    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .
-    . . . 1 1 . . .    . . . . . . . .    . . . . . . . .    . . . . . . . .
-    
-           8                 -1                  2                  5
-    '''
-    WEIGHTS = \
-        [-3, -10, 11, -4, 8, -1, 2, 5]
-    P_RINGS = [0x4281001818008142,
-               0x0042000000004200,
-               0x2400810000810024,
-               0x0024420000422400,
-               0x1800008181000018,
-               0x0018004242001800,
-               0x0000182424180000,
-               0x0000240000240000]
-    P_CORNER = 0x8100000000000081
-    P_SUB_CORNER = 0x42C300000000C342
-
-    def compute_reward(self):
+    def compute_reward(self, root_color, current_color):
         W = self.current_board[0]
         B = self.current_board[1]
 
-        mycorner = bit_count(W & self.P_CORNER)
-        opcorner = bit_count(B & self.P_CORNER)
-
         # piece difference
-        mypiece = mycorner * 100
-        for i in range(len(self.WEIGHTS)):
-            mypiece += self.WEIGHTS[i] * bit_count(W & self.P_RINGS[i])
-        oppiece = opcorner * 100
-        for i in range(len(self.WEIGHTS)):
-            oppiece += self.WEIGHTS[i] * bit_count(B & self.P_RINGS[i])
+        mypiece = bit_count(W)
+        oppiece = bit_count(B)
 
-        # scorepiece = \
-        #             10.0 * mypiece / (mypiece + oppiece) if mypiece > oppiece \
-        #             else -10.0 * oppiece / (mypiece + oppiece) if mypiece < oppiece \
-        #             else 0
-        scorepiece = mypiece - oppiece
+        # scorepiece = (mypiece > oppiece) + (mypiece < oppiece) * -1
+        # scorepiece = mypiece - oppiece
+        scorepiece = (mypiece > oppiece) * mypiece - (mypiece < oppiece) * oppiece  # 按赢家的子数计分
 
-        return scorepiece
+        return scorepiece * root_color * current_color
+
 
     def terminal(self):
         first_bitmove = move_gen(self.current_board[0], self.current_board[1])
@@ -287,7 +281,7 @@ class State:
 
     def get_next_move_with_random_choice(self):
         # print(self.color)
-        if(len(self.available_moves) == 0):
+        if len(self.available_moves) == 0:
             self.color = self.color * -1  # 更新新的State的Color数据
             (curW, curB) = self.current_board  # 获得当前棋盘状态
             self.current_board = (curB, curW)  # 更新新的State的棋盘数据
@@ -312,17 +306,18 @@ class State:
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 100  # 计算资源的预算
+        self.budget = 500  # 计算资源的预算
         self.root = Node()  # 根节点
         new_state = State()  # 根节点的状态
         self.root.state = new_state  # 绑定状态与节点
 
     def init_tree(self, board, color):
         self.root.state.current_board = to_bitboard(board)  # 将board数据转化成位图数据
+        # 判断颜色并交换
         if color == -1:
-            (self.root.state.current_board[0],
-             self.root.state.current_board[1]) = (self.root.state.current_board[1],
-                                                  self.root.state.current_board[0])
+            self.root.state.current_board = (self.root.state.current_board[1],
+                                             self.root.state.current_board[0])
+        # 如果根的color == -1，那么把黑色当成白色
         self.root.state.available_moves = get_move_list(move_gen(self.root.state.current_board[0],
                                                                  self.root.state.current_board[1]))
         shuffle(self.root.state.available_moves)
@@ -339,23 +334,21 @@ class MonteCarloTree:
                 return child  # Tree_Policy展开获得了当前的节点
         return node
 
-    @staticmethod
-    def default_policy(node):
+    def default_policy(self, node):
         current_state = copy.deepcopy(node.state)
         while not current_state.terminal():
             current_state.get_next_move_with_random_choice()
-        final_state_reward = current_state.compute_reward()
+        final_state_reward = current_state.compute_reward(self.root.state.color, current_state.color)
         return final_state_reward
 
-    @staticmethod
-    def backup(node, reward):
+    def backup(self, node, reward):
         while node is not None:
             node.visited_times += 1
             node.quality_value += reward
             node = node.parent
 
     def tree_search(self, node):
-        for i in range(self.budget):
+        for _ in range(self.budget):
             # 1. 寻找最优节点进行展开
             expand_node = self.tree_policy(node)
             # 2. 随机运行并计算结果
@@ -371,15 +364,127 @@ class DesmondEngine(Engine):
     def __init__(self):
         fill_bit_table()
         fill_radial_map()
+        self.alpha_beta = False
+        self.depth = 8
 
     def get_move(self, board, color, move_num=None,
                  time_remaining=None, time_opponent=None):
+        # print(move_num)
+
+        # 简单开局定式
+        if move_num == 0:
+            if color < 0:
+                return 5, 3
+            else:  # 对角开局
+                if board[2][4] == -1 or board[3][5] == -1:
+                    return 2, 5
+                if board[4][2] == -1 or board[5][3] == -1:
+                    return 5, 2
+        if move_num == 1:
+            if color < 0:
+                if board[3][2] == 1:  # 对手垂直开局
+                    return 2, 3
+                if board[5][2] == 1:  # 对手对角开局
+                    return 4, 2
+                if board[5][4] == 1:  # 对手平行开局
+                    return 4, 5
+
+        W, B = to_bitboard(board)
+        wb = (W, B) if color > 0 else (B, W)
+        available_moves = move_gen(wb[0], wb[1])
+
+        # 首选让对手无路可走的棋
+        if move_num < 26:
+            tmp_move_list = get_move_list(available_moves)
+            shuffle(tmp_move_list)  # 随机打乱
+            for move in tmp_move_list:
+                flip_mask = flip(wb[0], wb[1], move)
+                tmpW = wb[0] ^ (flip_mask | BIT[move])
+                tmpB = wb[1] ^ flip_mask
+                if move_gen(tmpB, tmpW) == 0:
+                    print(move_num, 'freeze')
+                    return to_move(move)
+
+        # 其次选占角
+        if move_num < 10:
+            corner_move_list = get_move_list(available_moves & P_CORNER)
+            if corner_move_list:
+                shuffle(corner_move_list)  # 随机打乱
+                print(move_num, 'corner', to_move(corner_move_list[0]))
+                return to_move(corner_move_list[0])
+
+        # 收官六步minimax
+        # if move_num > 24:
+        #     if self.alpha_beta:
+        #         res = self.alphabeta(wb[0], wb[1], self.depth, -float("inf"), float("inf"))
+        #     else:
+        #         res = self.minimax(wb[0], wb[1], self.depth)
+        #     return to_move(res[1])
+
+        # Todo: 判断下一步对方走棋后，我方是否会出现无棋可走的局面，如果是，则直接剪枝（？）
+
+        # 主体部分MCTS
         mcTree = MonteCarloTree()
         mcTree.init_tree(board, color)
         if mcTree.tree_search(mcTree.root) is None:
-            # print("No!!!!!!! No solution!")
             return None
-        else: return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
+        else:
+            return to_move(mcTree.tree_search(mcTree.root).state.move_from_parent)
+
+    def minimax(self, W, B, depth):
+        if depth == 0:
+            return self.eval(W, B), None
+        movemap = move_gen(W, B)
+        best = - float("inf")
+        bestmv = None
+        if movemap != 0:
+            bestmv, movemap = pop_lsb(movemap)
+        else:
+            return best, None
+
+        mv = bestmv
+        while True:
+            tmpW = W
+            tmpB = B
+            flipmask = flip(W, B, mv)
+            tmpW ^= flipmask | BIT[mv]
+            tmpB ^= flipmask
+
+            score = -self.minimax(tmpB, tmpW, depth - 1)[0]
+            if score > best:
+                best = score
+                bestmv = mv
+
+            if movemap == 0:
+                break
+            else:
+                mv, movemap = pop_lsb(movemap)
+
+        # print "color", "white" if color == 1 else "black", "depth", depth, "best", best, "legals", len(movelist)
+        return (best, bestmv)
+
+    def eval(self, W, B):
+        # mycorner = count_bit(W & self.P_CORNER)
+        # opcorner = count_bit(B & self.P_CORNER)
+
+        # piece difference
+        # mypiece = mycorner * 100
+        # for i in range(len(self.WEIGHTS)):
+        #     mypiece += self.WEIGHTS[i] * count_bit(W & self.P_RINGS[i])
+        # oppiece = opcorner * 100
+        # for i in range(len(self.WEIGHTS)):
+        #     oppiece += self.WEIGHTS[i] * count_bit(B & self.P_RINGS[i])
+
+        #         scorepiece = \
+        #             10.0 * mypiece / (mypiece + oppiece) if mypiece > oppiece \
+        #             else -10.0 * oppiece / (mypiece + oppiece) if mypiece < oppiece \
+        #             else 0
+        mypiece = bit_count(W)
+        oppiece = bit_count(B)
+        # scorepiece = mypiece - oppiece
+        scorepiece = (mypiece > oppiece) * mypiece - (mypiece < oppiece) * oppiece  # 按赢家的子数计分
+
+        return scorepiece
 
 
 engine = DesmondEngine
