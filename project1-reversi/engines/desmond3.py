@@ -257,7 +257,24 @@ class State:
     P_CORNER = 0x8100000000000081
     P_SUB_CORNER = 0x42C300000000C342
 
-    def compute_reward(self, root_color, current_color):
+    @staticmethod
+    def evalDiscDiff(self, root_color):
+    
+        mySC = bit_count(self.current_board[0])
+        opSC = bit_count(self.current_board[1])
+
+        return 100 * (mySC - opSC) / (mySC + opSC) * root_color * self.color;
+
+    @staticmethod
+    def evalMobility(self, root_color):
+        (curW, curB) = self.current_board
+        myMoveCount = len(get_move_list(move_gen(curW, curB)));
+        opMoveCount = len(get_move_list(move_gen(curB, curW)));
+
+        return 100 * (myMoveCount - opMoveCount) / (myMoveCount + opMoveCount + 1)
+
+    @staticmethod
+    def evalBoardMap(self, root_color):
         W = self.current_board[0]
         B = self.current_board[1]
 
@@ -272,13 +289,45 @@ class State:
         for i in range(len(self.WEIGHTS)):
             oppiece += self.WEIGHTS[i] * bit_count(B & self.P_RINGS[i])
 
+        return (mypiece - oppiece) / (mypiece + oppiece + 1) * root_color * self.color;
+
+    def evalParity(self):
+        remDiscs = 64 - bit_count(self.current_board[0] & self.current_board[1]);
+        if remDiscs % 2 == 0:
+            return -1
+        else:
+            return 1 
+
+    def compute_reward(self, root_color, current_color):
+
+        mob = State.evalMobility(self, root_color)
+
+        sc = State.evalDiscDiff(self, root_color)
+
+        return 2 * mob + sc + 1000 * State.evalBoardMap(self, root_color)
+
+
+     #   W = self.current_board[0]
+     #   B = self.current_board[1]
+
+      #  mycorner = bit_count(W & self.P_CORNER)
+      #  opcorner = bit_count(B & self.P_CORNER)
+
+        # piece difference
+      #  mypiece = mycorner * 100
+      #  for i in range(len(self.WEIGHTS)):
+      #      mypiece += self.WEIGHTS[i] * bit_count(W & self.P_RINGS[i])
+      #  oppiece = opcorner * 100
+      #  for i in range(len(self.WEIGHTS)):
+       #     oppiece += self.WEIGHTS[i] * bit_count(B & self.P_RINGS[i])
+
         # scorepiece = \
         #             10.0 * mypiece / (mypiece + oppiece) if mypiece > oppiece \
         #             else -10.0 * oppiece / (mypiece + oppiece) if mypiece < oppiece \
         #             else 0
-        scorepiece = mypiece - oppiece
+      #  scorepiece = mypiece - oppiece
 
-        return scorepiece * root_color * current_color
+     #   return scorepiece * root_color * current_color
 
 
     def terminal(self):
@@ -315,7 +364,7 @@ class State:
 
 class MonteCarloTree:
     def __init__(self):
-        self.budget = 800  # 计算资源的预算
+        self.budget = 500 # 计算资源的预算
         self.root = Node()  # 根节点
         new_state = State()  # 根节点的状态
         self.root.state = new_state  # 绑定状态与节点
