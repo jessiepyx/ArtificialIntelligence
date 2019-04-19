@@ -304,7 +304,7 @@ class State:
 
         sc = State.evalDiscDiff(self, root_color)
 
-        return 2 * mob + sc + 1000 * State.evalBoardMap(self, root_color)
+        return 2 * mob + sc + 1000 * State.evalBoardMap(self, root_color) * root_color * current_color
 
 
      #   W = self.current_board[0]
